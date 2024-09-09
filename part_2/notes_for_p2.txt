@@ -1,0 +1,12 @@
+Questions for Part 2
+This part concentrates on the sensor kinase phoR (Rv0758).
+EggNOG (http://eggnog6.embl.de/ ) provides groups of orthologous proteins across collections of species. The EggNOG group phoR belongs to is COG5002. Your tasks in this part are:
+
+
+A)To find and download the protein IDs (whatever format they may be) and sequences of proteins that belong both to COG5002 orthologous group and belong to species in the Mycobacteriaceae family. Upload your list of sequences in FASTA format on Gradescope, alongside a description of how you obtained it
+
+B)Buildamultiplesequencealignmentofthesequencesyoudownloadedin(a). Upload a screenshot showing part of your alignment, alongside a description of how you built the alignment
+
+C)Find and report the domains as defined by PFAM in the original Mtb sequence of phoR.
+
+D)Finally,showonthe3DstructureoftheMtbphoR(thismayneedtobeanalpha-fold model, if no information is available in the PDB) both the PFAM domains (e.g. highlighting them in different colours) and the positions of highest variation (in amino acid sequence) according to your multiple alignment in (b). Upload a high- quality image of the 3D structure annotated as instructed here.
