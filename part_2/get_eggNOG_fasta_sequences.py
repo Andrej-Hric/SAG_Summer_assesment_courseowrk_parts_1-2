@@ -1,44 +1,72 @@
-#note need to first install pip install requests
+import time
+from Bio.Blast import NCBIWWW, NCBIXML
+from Bio import SeqIO
 
-import csv
-import requests
+# Function to perform BLAST search and retrieve the best UniProt ID match
+def blast_sequence(sequence, retries=3):
+    """BLAST the sequence against UniProt to get the best match."""
+    for attempt in range(retries):
+        try:
+            # Perform BLAST search against the 'swissprot' (UniProtKB) database
+            result_handle = NCBIWWW.qblast("blastp", "swissprot", sequence)
+            blast_record = NCBIXML.read(result_handle)
 
-def fetch_sequence_from_eggnog(member_id):
-    """Fetch the sequence from the eggNOG API."""
-    url = f"http://eggnogapi6.embl.de/get_sequence/{member_id}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        # need to skip first line and replace header to get to sequences
-        return '\n'.join(response.text.splitlines()[1:])
-    else:
-        print(f"Error fetching sequence for {member_id}")
-        return None
-
-def tsv_to_fasta_eggnog(tsv_file: str, fasta_file: str):
-    """Convert the TSV to FASTA using the eggNOG API."""
-    with open(tsv_file, 'r') as infile, open(fasta_file, 'w') as outfile:
-        reader = csv.reader(infile, delimiter='\t')
-        next(reader)  # skip header
-        
-        for row in reader:
-            species = row[0].replace(" ", "_")  
-            taxid = row[1]
-            member_id = row[2]
-            
-            # fetching the sequence from the eggnog as in manual for eggnog API
-            sequence = fetch_sequence_from_eggnog(member_id)
-            
-            if sequence:
-                # write header and sequence to the FASTA file
-                header = f">{member_id}|taxid:{taxid}|{species}\n"
-                outfile.write(header)
-                outfile.write(sequence + "\n")
+            if blast_record.alignments:
+                # Get the best hit's accession (UniProt ID) from the first alignment
+                best_alignment = blast_record.alignments[0]
+                uniprot_id = best_alignment.accession
+                return uniprot_id
             else:
-                print(f"Error: No sequence found for {member_id}")
+                return None
+        except Exception as e:
+            print(f"BLAST search failed for sequence: {sequence[:30]}... Error: {e}")
+            time.sleep(1)  # Wait for a second before retrying
+    return None
 
+# Function to process the FASTA file and map sequences to UniProt IDs via BLAST
+def map_fasta_to_uniprot_blast(fasta_file: str, output_file: str, log_file: str):
+    """Map sequences in FASTA to their UniProt IDs using BLAST."""
+    with open(fasta_file, 'r') as fasta, open(output_file, 'w') as output, open(log_file, 'w') as log:
+        sequence = ""
+        header = ""
 
-tsv_file = 'COG5002_members_1762.tsv'  # path to the members tsv file 
-fasta_file = 'COG5002_eggnog_sequences.fasta'  # output in fasta format
+        for line in fasta:
+            if line.startswith(">"):  # Header line
+                if sequence:
+                    # Perform BLAST search for the previous sequence
+                    uniprot_id = blast_sequence(sequence)
 
-#TSV to FASTA format
-tsv_to_fasta_eggnog(tsv_file, fasta_file)
+                    if not uniprot_id:
+                        log.write(f"Failed to BLAST UniProt ID for sequence: {header}\n")
+                        print(f"Failed to fetch UniProt ID for: {header}")
+                    else:
+                        output.write(f">{uniprot_id}|\n")
+                        output.write(f"{sequence}\n")
+                        print(f"Success: {header} mapped to UniProt ID: {uniprot_id}")
+
+                    sequence = ""  # Reset sequence for the next entry
+                
+                header = line.strip()  # Set the new header
+            else:
+                sequence += line.strip()
+
+        # Process the last sequence in the file
+        if sequence:
+            uniprot_id = blast_sequence(sequence)
+            if not uniprot_id:
+                log.write(f"Failed to BLAST UniProt ID for sequence: {header}\n")
+                print(f"Failed to fetch UniProt ID for: {header}")
+            else:
+                output.write(f">{uniprot_id}|\n")
+                output.write(f"{sequence}\n")
+                print(f"Success: {header} mapped to UniProt ID: {uniprot_id}")
+
+# Paths to input/output files
+fasta_file = 'COG5002_eggnog_sequences.fasta'  # Input FASTA file
+output_file = 'COG5002_with_uniprot_ids_blast.fasta'  # Output FASTA with UniProt IDs (from BLAST)
+log_file = 'uniprot_blast_errors.log'  # Log file for failed BLAST searches
+
+# Run the BLAST-based mapping function
+map_fasta_to_uniprot_blast(fasta_file, output_file, log_file)
+
+print("BLAST processing complete. Check output and log files.")
